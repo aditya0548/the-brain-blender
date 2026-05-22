@@ -1,4 +1,6 @@
 import bpy
+from . import scene_reader
+from . import proportion_extractor
 
 bl_info = {
     "name": "The Brain",
@@ -20,6 +22,12 @@ class BRAIN_PT_panel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("brain.draw_skeleton", text="Draw Test Skeleton")
+        layout.operator("brain.read_scene", text="Read Scene")
+        layout.operator("brain.set_character_reference", text="Set Character Reference")
+
+        height = context.scene.brain_character_height
+        if height > 0.0:
+            layout.label(text=f"Locked Character Height: {height:.2f}m")
 
 class BRAIN_OT_draw_skeleton(bpy.types.Operator):
     bl_idname = "brain.draw_skeleton"
@@ -95,16 +103,49 @@ class BRAIN_OT_draw_skeleton(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class BRAIN_OT_read_scene(bpy.types.Operator):
+    bl_idname = "brain.read_scene"
+    bl_label = "Read Scene"
+    bl_description = "Reads scene information and prints to console"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        scene_reader.read_scene(context)
+        return {'FINISHED'}
+
+class BRAIN_OT_set_character_reference(bpy.types.Operator):
+    bl_idname = "brain.set_character_reference"
+    bl_label = "Set Character Reference"
+    bl_description = "Extracts height from active Grease Pencil layer and saves proportions"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        height = proportion_extractor.extract_and_save(context)
+        if height is not None:
+            context.scene.brain_character_height = height
+            self.report({'INFO'}, f"Character height locked at {height:.2f}m")
+        else:
+            self.report({'WARNING'}, "Could not extract character height. Make sure a GP object with strokes is active.")
+        return {'FINISHED'}
+
 classes = (
     BRAIN_PT_panel,
     BRAIN_OT_draw_skeleton,
+    BRAIN_OT_read_scene,
+    BRAIN_OT_set_character_reference,
 )
 
 def register():
+    bpy.types.Scene.brain_character_height = bpy.props.FloatProperty(
+        name="Character Height",
+        description="The locked height of the character",
+        default=0.0
+    )
     for cls in classes:
         bpy.utils.register_class(cls)
 
 def unregister():
+    del bpy.types.Scene.brain_character_height
     for cls in classes:
         bpy.utils.unregister_class(cls)
 
