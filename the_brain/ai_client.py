@@ -1,51 +1,31 @@
 import urllib.request
+import urllib.error
 import json
 import threading
 
-SYSTEM_PROMPT = "You are a 2D animation pose assistant. You receive a character's locked proportions and a camera setup. Your ONLY job is to return joint positions for the requested action. Return ONLY valid JSON, no text, no explanation. The JSON must contain these joints: head_top, head_center, neck, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, hip_center, left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle. Each joint is [x, y, z] in world space. Maintain the locked proportions exactly."
+SYSTEM_PROMPT = """You are a 2D animation pose assistant. Return ONLY valid JSON with no explanation. Return joint positions for the requested action with these exact keys: head_top, head_center, neck, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, hip_center, left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle. Each value is [x, y, z]. Also include target_frame (integer) and action_description (string)."""
 
-def call_openrouter(api_key, system_prompt, user_message):
-    url = 'https://openrouter.ai/api/v1/chat/completions'
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://blender-the-brain.local',
-    }
-    body = {
-        'model': 'google/gemini-2.0-flash-exp:free',
-        'messages': [
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_message}
-        ]
-    }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode('utf-8'),
-        headers=headers,
-        method='POST'
-    )
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read().decode('utf-8'))
-
-class AIThread(threading.Thread):
-    def __init__(self, api_key, system_prompt, user_message):
-        super().__init__()
-        self.api_key = api_key
-        self.system_prompt = system_prompt
-        self.user_message = user_message
-        self.result = None
-        self.error = None
-        self.is_done = False
-
-    def run(self):
+def call_openrouter(api_key, user_message, callback):
+    def run():
         try:
-            self.result = call_openrouter(self.api_key, self.system_prompt, self.user_message)
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            data = json.dumps({
+                "model": "google/gemini-2.0-flash-exp:free",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message}
+                ]
+            }).encode("utf-8")
+            req = urllib.request.Request(url, data=data, method="POST")
+            req.add_header("Authorization", f"Bearer {api_key}")
+            req.add_header("Content-Type", "application/json")
+            req.add_header("HTTP-Referer", "https://the-brain-blender.local")
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                content = result["choices"][0]["message"]["content"]
+                callback(content, None)
+        except urllib.error.HTTPError as e:
+            callback(None, f"HTTP {e.code}: {e.reason} — {e.read().decode()}")
         except Exception as e:
-            self.error = e
-        finally:
-            self.is_done = True
-
-def call_openrouter_async(api_key, user_message):
-    thread = AIThread(api_key, SYSTEM_PROMPT, user_message)
-    thread.start()
-    return thread
+            callback(None, str(e))
+    threading.Thread(target=run, daemon=True).start()
