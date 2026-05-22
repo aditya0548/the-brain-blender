@@ -88,7 +88,8 @@ class BRAIN_OT_draw_skeleton(bpy.types.Operator):
         ]
 
         for p1, p2 in lines:
-            stroke = frame.strokes.new()
+            frame.drawing.add_strokes(1)
+            stroke = frame.drawing.strokes[-1]
             stroke.display_mode = '3DSPACE'
             stroke.points.add(count=2)
             stroke.points[0].co = p1
