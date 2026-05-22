@@ -16,8 +16,7 @@ def call_openrouter(api_key, system_prompt, user_message):
         'messages': [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_message}
-        ],
-        'response_format': {'type': 'json_object'}
+        ]
     }
     req = urllib.request.Request(
         url,
