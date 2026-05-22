@@ -1,6 +1,7 @@
 import bpy
 from . import scene_reader
 from . import proportion_extractor
+from . import ai_client
 
 bl_info = {
     "name": "The Brain",
@@ -21,11 +22,21 @@ class BRAIN_PT_panel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
+        scene = context.scene
+
+        layout.prop(scene, "brain_api_key", text="API Key")
+        layout.prop(scene, "brain_user_message", text="Prompt")
+
+        layout.operator("brain.ask_ai", text="Ask AI")
+        layout.label(text=f"Status: {scene.brain_ai_status}")
+
+        layout.separator()
+
         layout.operator("brain.draw_skeleton", text="Draw Test Skeleton")
         layout.operator("brain.read_scene", text="Read Scene")
         layout.operator("brain.set_character_reference", text="Set Character Reference")
 
-        height = context.scene.brain_character_height
+        height = scene.brain_character_height
         if height > 0.0:
             layout.label(text=f"Locked Character Height: {height:.2f}m")
 
@@ -128,11 +139,67 @@ class BRAIN_OT_set_character_reference(bpy.types.Operator):
             self.report({'WARNING'}, "Could not extract character height. Make sure a GP object with strokes is active.")
         return {'FINISHED'}
 
+
+class BRAIN_OT_ask_ai(bpy.types.Operator):
+    bl_idname = "brain.ask_ai"
+    bl_label = "Ask AI"
+    bl_description = "Sends the user message to OpenRouter API"
+    bl_options = {'REGISTER'}
+
+    _timer = None
+    _thread = None
+
+    def modal(self, context, event):
+        if event.type == 'TIMER':
+            if self._thread and self._thread.is_done:
+                # Thread has finished
+                context.window_manager.event_timer_remove(self._timer)
+                if self._thread.error:
+                    self.report({'ERROR'}, f"API Error: {self._thread.error}")
+                    context.scene.brain_ai_status = "Error"
+                else:
+                    self.report({'INFO'}, "Received response from AI.")
+                    context.scene.brain_ai_status = "Response Received"
+                    # Here we could print or process self._thread.result
+                    print("AI Result:", self._thread.result)
+
+                # Request a redraw to update the UI
+                for area in context.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        area.tag_redraw()
+
+                return {'FINISHED'}
+        return {'PASS_THROUGH'}
+
+    def execute(self, context):
+        api_key = context.scene.brain_api_key
+        user_message = context.scene.brain_user_message
+
+        if not api_key:
+            self.report({'WARNING'}, "API Key is required.")
+            return {'CANCELLED'}
+        if not user_message:
+            self.report({'WARNING'}, "Prompt is required.")
+            return {'CANCELLED'}
+
+        context.scene.brain_ai_status = "Thinking..."
+
+        # Start background thread
+        self._thread = ai_client.call_openrouter_async(api_key, user_message)
+
+        # Start timer for polling
+        self._timer = context.window_manager.event_timer_add(0.1, window=context.window)
+        context.window_manager.modal_handler_add(self)
+
+        return {'RUNNING_MODAL'}
+
+
 classes = (
     BRAIN_PT_panel,
     BRAIN_OT_draw_skeleton,
     BRAIN_OT_read_scene,
     BRAIN_OT_set_character_reference,
+    BRAIN_OT_ask_ai,
 )
 
 def register():
@@ -141,11 +208,31 @@ def register():
         description="The locked height of the character",
         default=0.0
     )
+    bpy.types.Scene.brain_api_key = bpy.props.StringProperty(
+        name="API Key",
+        description="OpenRouter API Key",
+        default="",
+        subtype='PASSWORD'
+    )
+    bpy.types.Scene.brain_user_message = bpy.props.StringProperty(
+        name="User Message",
+        description="Prompt for the AI",
+        default=""
+    )
+    bpy.types.Scene.brain_ai_status = bpy.props.StringProperty(
+        name="AI Status",
+        description="Status of the AI request",
+        default="Ready"
+    )
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
 def unregister():
     del bpy.types.Scene.brain_character_height
+    del bpy.types.Scene.brain_api_key
+    del bpy.types.Scene.brain_user_message
+    del bpy.types.Scene.brain_ai_status
     for cls in classes:
         bpy.utils.unregister_class(cls)
 
