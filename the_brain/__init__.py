@@ -36,7 +36,7 @@ class BRAIN_OT_draw_skeleton(bpy.types.Operator):
                 break
 
         if not gp_obj:
-            gp_data = bpy.data.grease_pencils.new("Brain_GP")
+            gp_data = bpy.data.grease_pencils_v3.new("Brain_GP")
             gp_obj = bpy.data.objects.new("Brain_GP", gp_data)
             context.collection.objects.link(gp_obj)
 
@@ -48,8 +48,6 @@ class BRAIN_OT_draw_skeleton(bpy.types.Operator):
         mat = bpy.data.materials.get(mat_name)
         if not mat:
             mat = bpy.data.materials.new(name=mat_name)
-            bpy.data.materials.create_gpencil_data(mat)
-            mat.grease_pencil.color = (0.0, 1.0, 1.0, 1.0) # Cyan
 
         # Ensure material is in object slots
         if mat.name not in [m.name for m in gp_obj.data.materials if m]:
@@ -88,12 +86,10 @@ class BRAIN_OT_draw_skeleton(bpy.types.Operator):
         ]
 
         for p1, p2 in lines:
-            frame.drawing.add_strokes(1)
+            frame.drawing.add_strokes([2])
             stroke = frame.drawing.strokes[-1]
-            stroke.display_mode = '3DSPACE'
-            stroke.points.add(count=2)
-            stroke.points[0].co = p1
-            stroke.points[1].co = p2
+            stroke.points[0].position = p1
+            stroke.points[1].position = p2
             # Assign material
             stroke.material_index = mat_index
 
