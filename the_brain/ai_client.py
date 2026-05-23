@@ -10,7 +10,7 @@ def call_openrouter(api_key, user_message, callback):
         try:
             url = "https://openrouter.ai/api/v1/chat/completions"
             data = json.dumps({
-                "model": "meta-llama/llama-3.3-70b-instruct:free",
+                "models": ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-r1:free"],
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_message}
