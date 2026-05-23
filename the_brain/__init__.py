@@ -147,21 +147,17 @@ class BRAIN_OT_ask_ai(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     _timer = None
-    _thread = None
-
     def modal(self, context, event):
         if event.type == 'TIMER':
-            if self._thread and self._thread.is_done:
+            if hasattr(self, 'status') and self.status is not None:
                 # Thread has finished
                 context.window_manager.event_timer_remove(self._timer)
-                if self._thread.error:
-                    self.report({'ERROR'}, f"API Error: {self._thread.error}")
+                if self.status.startswith("Error:"):
+                    self.report({'ERROR'}, f"API {self.status}")
                     context.scene.brain_ai_status = "Error"
                 else:
                     self.report({'INFO'}, "Received response from AI.")
                     context.scene.brain_ai_status = "Response Received"
-                    # Here we could print or process self._thread.result
-                    print("AI Result:", self._thread.result)
 
                 # Request a redraw to update the UI
                 for area in context.screen.areas:
@@ -184,8 +180,17 @@ class BRAIN_OT_ask_ai(bpy.types.Operator):
 
         context.scene.brain_ai_status = "Thinking..."
 
+        self.status = None
+
+        def handle_response(content, error):
+            if error:
+                self.status = f"Error: {error}"
+            else:
+                self.status = "Response Received"
+                print("AI Response:", content)
+
         # Start background thread
-        self._thread = ai_client.call_openrouter(api_key, user_message)
+        ai_client.call_openrouter(api_key, user_message, handle_response)
 
         # Start timer for polling
         self._timer = context.window_manager.event_timer_add(0.1, window=context.window)
