@@ -10,7 +10,7 @@ def call_openrouter(api_key, user_message, callback):
         try:
             url = "https://openrouter.ai/api/v1/chat/completions"
             data = json.dumps({
-                "model": "google/gemini-2.0-flash-exp:free",
+                "model": "meta-llama/llama-3.3-70b-instruct:free",
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_message}
