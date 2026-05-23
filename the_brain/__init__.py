@@ -185,7 +185,7 @@ class BRAIN_OT_ask_ai(bpy.types.Operator):
         context.scene.brain_ai_status = "Thinking..."
 
         # Start background thread
-        self._thread = ai_client.call_openrouter_async(api_key, user_message)
+        self._thread = ai_client.call_openrouter(api_key, user_message)
 
         # Start timer for polling
         self._timer = context.window_manager.event_timer_add(0.1, window=context.window)
